@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectPilot — Управление рисками проекта</title>
+<style>
+:root {
+  --bg-primary: #F0F4F8;
+  --bg-card: #FFFFFF;
+  --bg-input: #F8FAFC;
+  --bg-sidebar: #0F172A;
+  --bg-overlay: rgba(15, 23, 42, 0.6);
+  --accent-primary: #1E40AF;
+  --accent-primary-hover: #1E3A8A;
+  --accent-secondary: #0891B2;
+  --status-done: #047857;
+  --status-done-bg: #D1FAE5;
+  --status-overdue: #B91C1C;
+  --status-overdue-bg: #FEE2E2;
+  --status-need-start: #B45309;
+  --status-need-start-bg: #FEF3C7;
+  --status-progress: #CA8A04;
+  --status-progress-bg: #FEF9C3;
+  --status-queued: #64748B;
+  --status-queued-bg: #F1F5F9;
+  --status-can-start: #0284C7;
+  --status-can-start-bg: #E0F2FE;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+  --text-sidebar: #CBD5E1;
+  --border: #E2E8F0;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.12);
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --sidebar-width: 250px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; min-height: 100vh; }
+.app-layout { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar { width: var(--sidebar-width); background: var(--bg-sidebar); color: var(--text-sidebar); position: fixed; top: 0; left: 0; bottom: 0; display: flex; flex-direction: column; padding: 24px 0; z-index: 50; }
+.sidebar-logo { display: flex; align-items: center; gap: 12px; padding: 0 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; }
+.sidebar-logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: 700; }
+.sidebar-logo-text { font-size: 18px; font-weight: 700; color: white; }
+.sidebar-nav { flex: 1; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 24px; cursor: pointer; transition: all 0.2s; font-size: 14px; font-weight: 500; border-left: 3px solid transparent; }
+.nav-item:hover { background: rgba(255,255,255,0.05); color: white; }
+.nav-item.active { background: rgba(59, 130, 246, 0.15); color: white; border-left-color: #3B82F6; }
+.nav-icon { font-size: 18px; width: 24px; text-align: center; }
+.sidebar-footer { padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.1); }
+.sidebar-user { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.sidebar-user-avatar { width: 32px; height: 32px; background: var(--accent-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.sidebar-user-name { color: white; font-size: 13px; font-weight: 500; }
+.sidebar-user-role { font-size: 11px; color: var(--text-muted); }
+.btn-reset { width: 100%; margin-top: 16px; font-size: 12px; color: #94A3B8; border-color: #334155; justify-content: center; background: transparent; border: 1px solid; border-radius: 6px; padding: 8px; cursor: pointer; transition: 0.2s; }
+.btn-reset:hover { background: rgba(255,255,255,0.05); color: white; }
+
+/* MAIN */
+.main-content { margin-left: var(--sidebar-width); flex: 1; min-height: 100vh; }
+.topbar { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow-sm); position: sticky; top: 0; z-index: 40; }
+.topbar-title { font-size: 18px; font-weight: 600; }
+.topbar-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.today-date { font-size: 14px; font-weight: 500; color: var(--text-secondary); background: var(--bg-input); padding: 6px 12px; border-radius: 20px; }
+.container { padding: 28px 32px; max-width: 1600px; }
+.screen { display: none; }
+.screen.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* BUTTONS & FORMS */
+.btn { padding: 10px 20px; border: none; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; }
+.btn-primary { background: var(--accent-primary); color: white; }
+.btn-primary:hover { background: var(--accent-primary-hover); }
+.btn-secondary { background: var(--accent-secondary); color: white; }
+.btn-danger { background: var(--status-overdue); color: white; }
+.btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--bg-input); }
+.btn-warning { background: var(--status-need-start); color: white; }
+.btn-warning:hover { opacity: 0.9; }
+.search-input { padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 14px; width: 250px; background: var(--bg-input); }
+.search-input:focus { outline: none; border-color: var(--accent-primary); background: white; }
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+.form-input, .form-select, .form-textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 14px; font-family: inherit; background: var(--bg-input); }
+.form-input:focus, .form-select:focus { outline: none; border-color: var(--accent-primary); background: white; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ===== ПОЛЗУНОК ПРОГРЕССА ===== */
+.project-progress-bar { width: 100%; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; margin-top: 12px; }
+.project-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)); border-radius: 4px; transition: width 0.5s ease; }
+.project-progress-text { font-size: 12px; color: var(--text-secondary); margin-top: 6px; display: flex; justify-content: space-between; }
+
+/* DASHBOARD */
+.projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 32px; }
+.project-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+.project-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(180deg, var(--accent-primary), var(--accent-secondary)); }
+.project-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.project-card-name { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.project-card-dates { color: var(--text-secondary); font-size: 13px; margin-bottom: 4px; }
+.project-deadline-badge { display: inline-block; background: var(--bg-input); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 12px; }
+.project-card-actions { position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; }
+.project-card-actions button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: 0.2s; }
+.project-card-actions button:hover { background: var(--bg-input); border-color: var(--accent-primary); }
+.urgent-section { padding-top: 24px; border-top: 2px solid var(--border); }
+.urgent-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.urgent-badge { background: var(--status-overdue); color: white; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.urgent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.urgent-card { background: var(--bg-card); border-radius: var(--radius-md); padding: 16px; border-left: 4px solid var(--status-overdue); box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.2s; }
+.urgent-card.soon { border-left-color: var(--status-need-start); }
+.urgent-card:hover { box-shadow: var(--shadow-md); transform: translateX(2px); }
+.urgent-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+.urgent-tag.overdue { background: var(--status-overdue-bg); color: var(--status-overdue); }
+.urgent-tag.soon { background: var(--status-need-start-bg); color: var(--status-need-start); }
+
+/* GANTT */
+.gantt-wrapper { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); margin-bottom: 24px; overflow-x: auto; }
+.gantt-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+.gantt-container { display: grid; grid-template-columns: 220px 1fr; min-width: 1000px; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.gantt-labels { background: var(--bg-input); border-right: 2px solid var(--border); }
+.gantt-label-header { height: 40px; padding: 10px 16px; font-size: 12px; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border); background: white; display: flex; align-items: center; }
+.gantt-label { height: 40px; padding: 0 16px; display: flex; align-items: center; font-size: 13px; font-weight: 500; border-bottom: 1px solid var(--border); cursor: pointer; }
+.gantt-label:hover { background: white; }
+.gantt-timeline { position: relative; overflow-x: auto; }
+.gantt-dates-header { display: flex; height: 40px; background: white; border-bottom: 1px solid var(--border); min-width: max-content; }
+.gantt-date-cell { width: 40px; min-width: 40px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: var(--text-secondary); }
+.gantt-date-cell.weekend { background: var(--bg-input); }
+.gantt-date-cell .day-num { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.gantt-body { position: relative; min-width: max-content; }
+.gantt-row { height: 40px; border-bottom: 1px solid var(--border); position: relative; }
+.gantt-bar { position: absolute; height: 24px; top: 8px; border-radius: 6px; display: flex; align-items: center; padding: 0 8px; font-size: 11px; font-weight: 500; color: white; cursor: pointer; transition: all 0.2s; overflow: hidden; white-space: nowrap; box-shadow: var(--shadow-sm); }
+.gantt-bar:hover { transform: scaleY(1.15); z-index: 5; }
+.c-done { background: var(--status-done); }
+.c-overdue { background: var(--status-overdue); }
+.c-need-start { background: var(--status-need-start); }
+.c-progress { background: var(--status-progress); }
+.c-queued { background: var(--status-queued); }
+.c-can-start { background: var(--status-can-start); }
+
+/* TASKS BY STATUS */
+.tasks-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.tasks-column { background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+.tasks-column-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+.task-card { background: var(--bg-input); border-radius: var(--radius-md); padding: 14px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; border-left: 4px solid transparent; }
+.task-card:hover { background: white; box-shadow: var(--shadow-md); transform: translateX(2px); }
+.task-card-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.task-card-meta { font-size: 12px; color: var(--text-secondary); }
+
+/* DEPENDENCIES GRAPH */
+.dep-graph-wrapper { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); overflow-x: auto; }
+.dep-graph { position: relative; min-height: 400px; padding: 20px; }
+.dep-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.dep-node { position: absolute; background: white; border: 2px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; min-width: 180px; box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.2s; z-index: 2; }
+.dep-node:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.dep-node-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.dep-node-dates { font-size: 11px; color: var(--text-secondary); }
+
+/* EMPLOYEES */
+.employees-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
+.employee-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px; border: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
+.employee-avatar { width: 48px; height: 48px; background: var(--accent-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; }
+.employee-info h4 { font-size: 15px; font-weight: 600; }
+.employee-info p { font-size: 13px; color: var(--text-secondary); }
+.btn-delete-emp { margin-left: auto; background: none; border: none; color: var(--status-overdue); cursor: pointer; font-size: 18px; }
+
+/* MODALS */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-overlay); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal { background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); max-width: 550px; width: 100%; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s ease; }
+.modal-large { max-width: 700px; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.modal-title { font-size: 16px; font-weight: 600; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; background: var(--status-overdue); color: white; border: none; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 12px; background: var(--bg-input); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.modal-footer .btn { flex: 1; justify-content: center; }
+
+/* ANALYSIS */
+.analysis-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.analysis-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+.result-alert { padding: 16px; border-radius: var(--radius-md); margin-bottom: 16px; }
+.result-alert.danger { background: var(--status-overdue-bg); border-left: 4px solid var(--status-overdue); }
+.result-alert.success { background: var(--status-done-bg); border-left: 4px solid var(--status-done); }
+.result-alert.warning { background: var(--status-need-start-bg); border-left: 4px solid var(--status-need-start); }
+.result-block { background: var(--bg-input); border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px; }
+.result-block-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; }
+.result-task-chip { display: inline-block; background: white; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: 500; border: 1px solid var(--border); margin: 2px; }
+.result-task-chip.danger { border-color: var(--status-overdue); color: var(--status-overdue); background: var(--status-overdue-bg); }
+.result-task-chip.critical { border-color: var(--status-need-start); color: var(--status-need-start); background: var(--status-need-start-bg); }
+.result-recommendation { background: var(--status-can-start-bg); border-left: 4px solid var(--status-can-start); padding: 14px 18px; border-radius: var(--radius-md); margin-top: 12px; }
+
+/* ===== РИСКИ И ПРЕДУПРЕЖДЕНИЯ ===== */
+.risk-panel { background: var(--bg-input); border-radius: var(--radius-md); padding: 16px; margin-top: 12px; border: 1px solid var(--border); }
+.risk-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px; background: white; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--status-need-start); }
+.risk-item.high { border-left-color: var(--status-overdue); background: var(--status-overdue-bg); }
+.risk-item.medium { border-left-color: var(--status-need-start); background: var(--status-need-start-bg); }
+.risk-item.low { border-left-color: var(--status-can-start); background: var(--status-can-start-bg); }
+.risk-icon { font-size: 18px; }
+.risk-content { flex: 1; }
+.risk-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.risk-desc { font-size: 12px; color: var(--text-secondary); }
+.cost-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--status-overdue-bg); color: var(--status-overdue); margin-top: 6px; }
+
+/* TOAST */
+.toast-container { position: fixed; top: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 10px; }
+.toast { background: var(--bg-card); padding: 14px 20px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border-left: 4px solid var(--accent-primary); animation: slideIn 0.3s ease; min-width: 280px; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ===== КОНТР-ФИЧА: РЕКОМЕНДАЦИИ ===== */
+.recommendations-panel { background: linear-gradient(135deg, var(--status-can-start-bg), var(--bg-input)); border-radius: var(--radius-lg); padding: 20px; margin-top: 20px; border: 2px solid var(--status-can-start); }
+.recommendations-title { font-size: 16px; font-weight: 600; color: var(--status-can-start); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.recommendation-item { background: white; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--status-can-start); }
+.recommendation-item strong { font-size: 13px; }
+.recommendation-item p { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="app-layout">
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">⚡</div>
+    <div class="sidebar-logo-text">ProjectPilot</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" data-screen="screenDashboard" onclick="switchScreen('screenDashboard', this)">
+      <span class="nav-icon"></span><span>Главный экран</span>
+    </div>
+    <div class="nav-item" data-screen="screenTasks" onclick="switchScreen('screenTasks', this)">
+      <span class="nav-icon">📋</span><span>Задачи</span>
+    </div>
+    <div class="nav-item" data-screen="screenDependencies" onclick="switchScreen('screenDependencies', this)">
+      <span class="nav-icon">🧩</span><span>Зависимости</span>
+    </div>
+    <div class="nav-item" data-screen="screenAnalysis" onclick="switchScreen('screenAnalysis', this)">
+      <span class="nav-icon">📊</span><span>Анализ изменений</span>
+    </div>
+    <div class="nav-item" data-screen="screenEmployees" onclick="switchScreen('screenEmployees', this)">
+      <span class="nav-icon">👥</span><span>Сотрудники</span>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Руководитель проекта</div>
+    <div class="sidebar-user">
+      <div class="sidebar-user-avatar">РП</div>
+      <div>
+        <div class="sidebar-user-name">Администратор</div>
+        <div class="sidebar-user-role">admin@project.ru</div>
+      </div>
+    </div>
+    <button class="btn-reset" onclick="clearData()">🗑 Сбросить все данные</button>
+  </div>
+</aside>
+
+<main class="main-content">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbarTitle">Главный экран</div>
+      <div class="topbar-subtitle" id="topbarSubtitle">Обзор проектов и срочных задач</div>
+    </div>
+    <div class="topbar-right">
+      <div class="today-date" id="todayDateDisplay"></div>
+      <button class="btn btn-primary" onclick="openModal('modalCreateProject')">＋ Новый проект</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="screen active" id="screenDashboard">
+    <div class="container">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2 style="font-size:20px;">Мои проекты</h2>
+        <input type="text" class="search-input" placeholder="🔍 Поиск проекта..." oninput="renderDashboard(this.value)">
+      </div>
+      <div class="projects-grid" id="projectsGrid"></div>
+      <div class="urgent-section" id="urgentSection" style="display: none;">
+        <div class="urgent-header">
+          <div class="urgent-title">⚠️ Срочные задачи</div>
+          <div class="urgent-badge" id="urgentCount">0</div>
+        </div>
+        <div class="urgent-grid" id="urgentGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASKS -->
+  <div class="screen" id="screenTasks">
+    <div class="container">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div style="flex:1; max-width:400px;">
+          <label class="form-label">Выберите проект</label>
+          <select class="form-select" id="tasksProjectSelect" onchange="renderTasksScreen()"></select>
+        </div>
+        <input type="text" class="search-input" placeholder="🔍 Поиск задачи..." oninput="renderTasksByStatus(getCurrentProject(), this.value)">
+      </div>
+      <div id="projectDeadlineDisplay" style="background: var(--status-need-start-bg); color: var(--status-need-start); padding: 12px 20px; border-radius: var(--radius-md); margin-bottom: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;"></div>
+      <div class="gantt-wrapper">
+        <div class="gantt-legend">
+          <div class="legend-item"><div class="legend-dot c-done"></div> Выполнено</div>
+          <div class="legend-item"><div class="legend-dot c-overdue"></div> Просрочено</div>
+          <div class="legend-item"><div class="legend-dot c-need-start"></div> Необходимо начать</div>
+          <div class="legend-item"><div class="legend-dot c-progress"></div> В процессе</div>
+          <div class="legend-item"><div class="legend-dot c-can-start"></div> Можно начать</div>
+          <div class="legend-item"><div class="legend-dot c-queued"></div> В очереди</div>
+        </div>
+        <div id="ganttContainer"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size:16px;"> Задачи по статусам</h3>
+        <button class="btn btn-secondary" onclick="openAddTaskModal()">＋ Добавить задачу</button>
+      </div>
+      <div class="tasks-section" id="tasksByStatus"></div>
+    </div>
+  </div>
+
+  <!-- DEPENDENCIES -->
+  <div class="screen" id="screenDependencies">
+    <div class="container">
+      <div style="max-width:400px; margin-bottom: 20px;">
+        <label class="form-label">Выберите проект</label>
+        <select class="form-select" id="depProjectSelect" onchange="renderDependenciesScreen()"></select>
+      </div>
+      <div class="dep-graph-wrapper">
+        <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+          <h3 style="font-size:16px; display:flex; align-items:center; gap:8px;">🔗 Граф зависимостей задач</h3>
+          <span style="font-size: 13px; color: var(--text-secondary);">Стрелки показывают направление зависимости</span>
+        </div>
+        <div class="dep-graph" id="depGraph"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYSIS -->
+  <div class="screen" id="screenAnalysis">
+    <div class="container">
+      <div style="max-width:400px; margin-bottom: 20px;">
+        <label class="form-label">Выберите проект для анализа</label>
+        <select class="form-select" id="analysisProjectSelect" onchange="renderAnalysisScreen()"></select>
+      </div>
+      <div class="analysis-layout">
+        <div class="analysis-card">
+          <h3 style="font-size:18px; font-weight:600; margin-bottom:20px;">🎯 Сценарий изменения</h3>
+          <div class="form-group">
+            <label class="form-label">Изменяемая задача</label>
+            <select class="form-select" id="analysisTask" onchange="updateAnalysisDeadline()"><option value="">— Выберите задачу —</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Текущий дедлайн</label>
+            <input type="text" class="form-input" id="analysisCurrentDeadline" readonly style="background: var(--bg-input);">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Новый дедлайн</label>
+            <input type="date" class="form-input" id="analysisNewDeadline">
+          </div>
+          <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="calculateImpact()">Рассчитать последствия</button>
+        </div>
+        <div class="analysis-card">
+          <h3 style="font-size:18px; font-weight:600; margin-bottom:20px;">📊 Анализ последствий</h3>
+          <div id="analysisPlaceholder" style="text-align:center; padding:40px 20px; color:var(--text-muted);">
+            <div style="font-size:48px; margin-bottom:12px; opacity:0.3;">📊</div>
+            <div>Выберите задачу и новый дедлайн, чтобы увидеть последствия</div>
+          </div>
+          <div id="analysisResult" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPLOYEES -->
+  <div class="screen" id="screenEmployees">
+    <div class="container">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2 style="font-size:20px;">Сотрудники</h2>
+        <div style="display:flex; gap:12px;">
+          <input type="text" class="search-input" placeholder="🔍 Поиск сотрудника..." oninput="renderEmployees(this.value)">
+          <button class="btn btn-primary" onclick="openModal('modalAddEmployee')">＋ Добавить сотрудника</button>
+        </div>
+      </div>
+      <div class="employees-grid" id="employeesGrid"></div>
+      
+      <!-- ===== КОНТР-ФИЧА: РЕКОМЕНДАЦИИ ПО РЕСУРСАМ ===== -->
+      <div class="recommendations-panel" id="recommendationsPanel">
+        <div class="recommendations-title"> Автоматические рекомендации по ресурсам</div>
+        <div id="recommendationsContent"></div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modalCreateProject">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Новый проект</div><button class="modal-close" onclick="closeModal('modalCreateProject')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Название проекта</label><input type="text" class="form-input" id="newProjectName"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Дата начала</label><input type="date" class="form-input" id="newProjectStart"></div>
+        <div class="form-group"><label class="form-label">Дедлайн</label><input type="date" class="form-input" id="newProjectDeadline"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalCreateProject')">Отмена</button>
+      <button class="btn btn-primary" onclick="createProject()">Создать проект</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== МОДАЛКА РЕДАКТИРОВАНИЯ ПРОЕКТА С АНАЛИЗОМ РИСКОВ ===== -->
+<div class="modal-overlay" id="modalEditProject">
+  <div class="modal modal-large">
+    <div class="modal-header"><div class="modal-title">✏️ Редактировать проект</div><button class="modal-close" onclick="closeModal('modalEditProject')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Название проекта</label><input type="text" class="form-input" id="editProjectName"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Дата начала</label><input type="date" class="form-input" id="editProjectStart"></div>
+        <div class="form-group"><label class="form-label">Дедлайн</label><input type="date" class="form-input" id="editProjectDeadline" onchange="analyzeProjectDeadlineChange()"></div>
+      </div>
+      
+      <!-- Анализ рисков при изменении дедлайна -->
+      <div id="projectDeadlineRiskAnalysis" style="display:none; margin-top:16px;">
+        <div class="risk-panel">
+          <div style="font-weight:600; margin-bottom:12px; color:var(--text-primary);">️ Анализ рисков при изменении дедлайна</div>
+          <div id="projectRiskContent"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalEditProject')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveProjectEdit()">Сохранить изменения</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalAddTask">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Новая задача</div><button class="modal-close" onclick="closeModal('modalAddTask')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Название</label><input type="text" class="form-input" id="taskName"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Начало</label><input type="date" class="form-input" id="taskStart"></div>
+        <div class="form-group"><label class="form-label">Дедлайн</label><input type="date" class="form-input" id="taskDeadline"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Описание</label><textarea class="form-input" id="taskDesc" rows="2"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Ответственный</label><select class="form-select" id="taskAssignee"></select></div>
+        <div class="form-group"><label class="form-label">Статус</label>
+          <select class="form-select" id="taskStatus">
+  	    <option value="pending">Не начато</option>
+            <option value="progress">В процессе</option>
+            <option value="done">Выполнено</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Зависит от</label><select class="form-select" id="taskDependsOn" multiple style="min-height: 80px;"></select><div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Удерживайте Ctrl для выбора нескольких</div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalAddTask')">Отмена</button>
+      <button class="btn btn-primary" onclick="createTask()">Создать задачу</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalTaskInfo">
+  <div class="modal modal-large">
+    <div class="modal-header"><div class="modal-title" id="taskInfoTitle">—</div><button class="modal-close" onclick="closeModal('modalTaskInfo')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Начало</label><input type="date" class="form-input" id="editTaskStart" onchange="analyzeTaskChange()"></div>
+        <div class="form-group"><label class="form-label">Дедлайн</label><input type="date" class="form-input" id="editTaskDeadline" onchange="analyzeTaskChange()"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Описание</label><textarea class="form-input" id="editTaskDesc" rows="2"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Ответственный</label><select class="form-select" id="editTaskAssignee"></select></div>
+        <div class="form-group"><label class="form-label">Статус</label>
+          <select class="form-select" id="editTaskStatus" onchange="analyzeTaskChange()">
+            <option value="pending">Не начато</option>
+            <option value="progress">В процессе</option>
+            <option value="done">Выполнено</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">🔗 Зависит от</label>
+        <select class="form-select" id="editTaskDependsOn" multiple style="min-height: 80px;" onchange="analyzeTaskChange()"></select>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Удерживайте Ctrl для выбора нескольких</div>
+      </div>
+
+      <!-- ===== АНАЛИЗ РИСКОВ ПРИ ИЗМЕНЕНИИ ЗАДАЧИ ===== -->
+      <div id="taskChangeRiskAnalysis" style="display:none; margin-top:16px;">
+        <div class="risk-panel">
+          <div style="font-weight:600; margin-bottom:12px; color:var(--text-primary);">⚠️ Анализ последствий изменения</div>
+          <div id="taskRiskContent"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" onclick="confirmDeleteTask()">Удалить</button>
+      <button class="btn btn-primary" onclick="saveTaskEdit()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalAddEmployee">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Новый сотрудник</div><button class="modal-close" onclick="closeModal('modalAddEmployee')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">ФИО</label><input type="text" class="form-input" id="empName" placeholder="Иванов И.И."></div>
+      <div class="form-group"><label class="form-label">Специальность / Роль</label><input type="text" class="form-input" id="empRole" placeholder="Frontend разработчик"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalAddEmployee')">Отмена</button>
+      <button class="btn btn-primary" onclick="createEmployee()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ===== DATA & STATE =====
+const today = new Date();
+const todayStr = today.toISOString().split('T')[0];
+document.getElementById('todayDateDisplay').textContent = 'Сегодня: ' + today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+
+function addDays(dateStr, days) { const d = new Date(dateStr); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0]; }
+function daysBetween(d1, d2) { return Math.round((new Date(d2) - new Date(d1)) / (1000 * 60 * 60 * 24)); }
+function formatDate(dateStr) { if (!dateStr) return '—'; return new Date(dateStr).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+function formatDateShort(dateStr) { if (!dateStr) return '—'; return new Date(dateStr).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }); }
+
+// ===== ДЕМО-ДАННЫЕ: 9 ЗАДАЧ (8+ ПО ТЗ) =====
+let state = {
+  projects: [{
+    id: 'p1', name: 'Запуск мобильного приложения', startDate: '2026-10-01', deadline: '2026-11-30',
+    tasks: [
+      { id: 't1', name: 'Анализ требований', start: '2026-10-01', deadline: '2026-10-10', status: 'done', assignee: 'Иванова М.С.', desc: 'Сбор требований', dependsOn: [] },
+      { id: 't2', name: 'Дизайн интерфейса', start: '2026-10-11', deadline: '2026-10-25', status: 'done', assignee: 'Петров К.В.', desc: 'UI/UX дизайн', dependsOn: ['t1'] },
+      { id: 't3', name: 'Архитектура системы', start: '2026-10-11', deadline: '2026-10-20', status: 'done', assignee: 'Семёнов А.Ю.', desc: 'Проектирование backend', dependsOn: ['t1'] },
+      { id: 't4', name: 'Разработка backend', start: '2026-10-21', deadline: '2026-11-10', status: 'progress', assignee: 'Семёнов А.Ю.', desc: 'Серверная часть', dependsOn: ['t3'] },
+      { id: 't5', name: 'Разработка frontend', start: '2026-10-26', deadline: '2026-11-15', status: 'progress', assignee: 'Петров К.В.', desc: 'Клиентская часть', dependsOn: ['t2'] },
+      { id: 't6', name: 'Интеграционное тестирование', start: '2026-11-16', deadline: '2026-11-25', status: 'progress', assignee: 'Пономарёв Д.Е.', desc: 'Тестирование', dependsOn: ['t4', 't5'] },
+      { id: 't7', name: 'Релиз в App Store', start: '2026-11-26', deadline: '2026-11-30', status: 'progress', assignee: 'Иванова М.С.', desc: 'Публикация', dependsOn: ['t6'] },
+      { id: 't8', name: 'Маркетинговая кампания', start: '2026-11-26', deadline: '2026-11-30', status: 'queued', assignee: 'Иванова М.С.', desc: 'Запуск рекламы и PR', dependsOn: ['t6'] },
+      { id: 't9', name: 'Техническая поддержка', start: '2026-12-01', deadline: '2026-12-15', status: 'queued', assignee: 'Пономарёв Д.Е.', desc: 'Поддержка после релиза', dependsOn: ['t7', 't8'] }
+    ]
+  }],
+  employees: [
+    { id: 'e1', name: 'Иванова М.С.', role: 'Project Manager / Аналитик' },
+    { id: 'e2', name: 'Петров К.В.', role: 'UI/UX Дизайнер / Frontend' },
+    { id: 'e3', name: 'Семёнов А.Ю.', role: 'Backend разработчик' },
+    { id: 'e4', name: 'Пономарёв Д.Е.', role: 'QA Инженер' }
+  ],
+  currentProjectId: 'p1'
+};
+
+// ===== LOCALSTORAGE =====
+const STORAGE_KEY = 'projectflow_v2';
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function loadState() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) { try { const parsed = JSON.parse(saved); if(parsed.projects) { state = parsed; return true; } } catch(e){} }
+  return false;
+}
+function clearData() {
+  if (confirm('Все данные будут удалены. Загрузить демо-данные?')) {
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  }
+}
+if (!loadState()) saveState();
+
+// ===== CORE LOGIC: STATUS CALCULATION =====
+function getEffectiveStatus(task, allTasks) {
+  if (task.status === 'done') return 'done';
+  const depsMet = task.dependsOn.every(depId => {
+    const depTask = allTasks.find(t => t.id === depId);
+    return depTask && depTask.status === 'done';
+  });
+  const isOverdue = task.deadline < todayStr;
+  const isStartPassed = task.start <= todayStr;
+  if (isOverdue) return 'overdue';
+  if (!depsMet) return 'queued';
+  if (depsMet && !isStartPassed) return 'can-start';
+  if (depsMet && isStartPassed && task.status !== 'progress') return 'need-start';
+  return task.status || 'progress';
+}
+function getStatusName(s) {
+  const map = { done: 'Выполнено', overdue: 'Просрочено', 'need-start': 'Необходимо начать', progress: 'В процессе', 'can-start': 'Можно начать', queued: 'В очереди' };
+  return map[s] || s;
+}
+
+// ===== НАВИГАЦИЯ =====
+function switchScreen(screenId, navItem) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (navItem) navItem.classList.add('active');
+  const titles = {
+    screenDashboard: ['Главный экран', 'Обзор проектов и срочных задач'],
+    screenTasks: ['Задачи', 'Диаграмма Ганта и управление задачами'],
+    screenDependencies: ['Зависимости', 'Граф связей между задачами'],
+    screenAnalysis: ['Анализ изменений', 'Оценка последствий изменений'],
+    screenEmployees: ['Сотрудники', 'Управление командой проекта']
+  };
+  document.getElementById('topbarTitle').textContent = titles[screenId][0];
+  document.getElementById('topbarSubtitle').textContent = titles[screenId][1];
+  if (screenId === 'screenDashboard') renderDashboard();
+  if (screenId === 'screenTasks') renderTasksScreen();
+  if (screenId === 'screenDependencies') renderDependenciesScreen();
+  if (screenId === 'screenAnalysis') renderAnalysisScreen();
+  if (screenId === 'screenEmployees') { renderEmployees(); renderRecommendations(); }
+  window.scrollTo(0, 0);
+}
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function showToast(title, message, type='info') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div'); t.className = 'toast';
+  if(type==='success') t.style.borderLeftColor = 'var(--status-done)';
+  if(type==='danger') t.style.borderLeftColor = 'var(--status-overdue)';
+  if(type==='warning') t.style.borderLeftColor = 'var(--status-need-start)';
+  t.innerHTML = `<div style="font-weight:600; font-size:14px; margin-bottom:4px;">${title}</div><div style="font-size:13px; color:var(--text-secondary);">${message}</div>`;
+  c.appendChild(t); setTimeout(() => t.remove(), 4000);
+}
+function getCurrentProject() { return state.projects.find(p => p.id === state.currentProjectId); }
+
+// ===== ПОЛЗУНОК ПРОГРЕССА =====
+function getProjectProgress(p) {
+  const total = p.tasks.length;
+  const done = p.tasks.filter(t => t.status === 'done').length;
+  return total > 0 ? Math.round((done / total) * 100) : 0;
+}
+
+// ===== DASHBOARD С ПОЛЗУНКОМ =====
+function renderDashboard(search = '') {
+  const grid = document.getElementById('projectsGrid');
+  const filtered = state.projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-muted);">Проекты не найдены</div>';
+  } else {
+    grid.innerHTML = filtered.map(p => {
+      const daysLeft = daysBetween(todayStr, p.deadline);
+      const daysText = daysLeft < 0 ? `Просрочен на ${Math.abs(daysLeft)} дн.` : `Осталось ${daysLeft} дн.`;
+      const badgeColor = daysLeft < 0 ? 'var(--status-overdue-bg)' : (daysLeft <= 7 ? 'var(--status-need-start-bg)' : 'var(--bg-input)');
+      const badgeTextColor = daysLeft < 0 ? 'var(--status-overdue)' : (daysLeft <= 7 ? 'var(--status-need-start)' : 'var(--text-primary)');
+      
+      const totalTasks = p.tasks.length;
+      const doneTasks = p.tasks.filter(t => t.status === 'done').length;
+      const progressTasks = p.tasks.filter(t => t.status === 'progress').length;
+      const overdueTasks = p.tasks.filter(t => t.deadline < todayStr && t.status !== 'done').length;
+      const otherTasks = totalTasks - doneTasks - progressTasks;
+      const progress = getProjectProgress(p);
+
+      return `
+      <div class="project-card" onclick="state.currentProjectId='${p.id}'; saveState(); switchScreen('screenTasks', document.querySelector('[data-screen=screenTasks]'))">
+        <div class="project-card-actions">
+          <button onclick="event.stopPropagation(); openEditProjectModal('${p.id}')" title="Редактировать проект">✏️</button>
+        </div>
+        <div class="project-card-name">${p.name}</div>
+        <div class="project-card-dates">📅 ${formatDate(p.startDate)} — ${formatDate(p.deadline)}</div>
+        <div class="project-deadline-badge" style="background:${badgeColor}; color:${badgeTextColor};">⏳ ${daysText}</div>
+        
+        <!-- ПОЛЗУНОК ПРОГРЕССА -->
+        <div class="project-progress-bar">
+          <div class="project-progress-fill" style="width: ${progress}%"></div>
+        </div>
+        <div class="project-progress-text">
+          <span>Прогресс: <strong>${progress}%</strong></span>
+          <span>${doneTasks}/${totalTasks} задач</span>
+        </div>
+        
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+          <span style="font-size:11px; padding:3px 8px; background:var(--status-done-bg); color:var(--status-done); border-radius:10px;">✅ ${doneTasks} выполнено</span>
+          <span style="font-size:11px; padding:3px 8px; background:var(--status-progress-bg); color:var(--status-progress); border-radius:10px;">🔄 ${progressTasks} в процессе</span>
+          ${overdueTasks > 0 ? `<span style="font-size:11px; padding:3px 8px; background:var(--status-overdue-bg); color:var(--status-overdue); border-radius:10px;">🔴 ${overdueTasks} просрочено</span>` : ''}
+          ${otherTasks > 0 ? `<span style="font-size:11px; padding:3px 8px; background:var(--status-queued-bg); color:var(--status-queued); border-radius:10px;">⏳ ${otherTasks} ожидает</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  renderUrgentTasks();
+}
+
+// ===== РЕДАКТИРОВАНИЕ ПРОЕКТА С АНАЛИЗОМ РИСКОВ =====
+function openEditProjectModal(pid) {
+  const p = state.projects.find(x => x.id === pid);
+  if (!p) return;
+  document.getElementById('editProjectName').value = p.name;
+  document.getElementById('editProjectStart').value = p.startDate;
+  document.getElementById('editProjectDeadline').value = p.deadline;
+  document.getElementById('projectDeadlineRiskAnalysis').style.display = 'none';
+  window.currentEditProjectId = pid;
+  openModal('modalEditProject');
+}
+
+function analyzeProjectDeadlineChange() {
+  const p = state.projects.find(x => x.id === window.currentEditProjectId);
+  if (!p) return;
+  
+  const newDeadline = document.getElementById('editProjectDeadline').value;
+  if (!newDeadline) return;
+  
+  const oldDeadline = p.deadline;
+  const shiftDays = daysBetween(oldDeadline, newDeadline);
+  
+  if (shiftDays === 0) {
+    document.getElementById('projectDeadlineRiskAnalysis').style.display = 'none';
+    return;
+  }
+  
+  // Анализ рисков
+  const atRiskTasks = p.tasks.filter(t => {
+    if (t.status === 'done') return false;
+    return new Date(t.deadline) > new Date(newDeadline);
+  });
+  
+  const criticalTasks = p.tasks.filter(t => {
+    if (t.status === 'done') return false;
+    const daysToDeadline = daysBetween(todayStr, t.deadline);
+    return daysToDeadline <= 7 && daysToDeadline >= 0;
+  });
+  
+  let riskHtml = '';
+  
+  if (shiftDays > 0) {
+    riskHtml += `<div class="risk-item high">
+      <div class="risk-icon">🚨</div>
+      <div class="risk-content">
+        <div class="risk-title">Дедлайн сдвигается на +${shiftDays} дн.</div>
+        <div class="risk-desc">Проект завершится позже запланированного срока</div>
+        <div class="cost-badge">Стоимость: ${shiftDays} дней задержки</div>
+      </div>
+    </div>`;
+  } else {
+    riskHtml += `<div class="risk-item low">
+      <div class="risk-icon">✅</div>
+      <div class="risk-content">
+        <div class="risk-title">Дедлайн ускоряется на ${Math.abs(shiftDays)} дн.</div>
+        <div class="risk-desc">Проект завершится раньше срока</div>
+      </div>
+    </div>`;
+  }
+  
+  if (atRiskTasks.length > 0) {
+    riskHtml += `<div class="risk-item high">
+      <div class="risk-icon">⚠️</div>
+      <div class="risk-content">
+        <div class="risk-title">${atRiskTasks.length} задач выходят за новый дедлайн</div>
+        <div class="risk-desc">${atRiskTasks.map(t => t.name).join(', ')}</div>
+        <div class="cost-badge">Риск: срыв сроков задач</div>
+      </div>
+    </div>`;
+  }
+  
+  if (criticalTasks.length > 0) {
+    riskHtml += `<div class="risk-item medium">
+      <div class="risk-icon">🔔</div>
+      <div class="risk-content">
+        <div class="risk-title">${criticalTasks.length} критических задач (дедлайн ≤ 7 дней)</div>
+        <div class="risk-desc">${criticalTasks.map(t => t.name).join(', ')}</div>
+        <div class="cost-badge">Требуется внимание</div>
+      </div>
+    </div>`;
+  }
+  
+  document.getElementById('projectRiskContent').innerHTML = riskHtml;
+  document.getElementById('projectDeadlineRiskAnalysis').style.display = 'block';
+}
+
+function saveProjectEdit() {
+  const p = state.projects.find(x => x.id === window.currentEditProjectId);
+  if (!p) return;
+  
+  const oldDeadline = p.deadline;
+  p.name = document.getElementById('editProjectName').value.trim();
+  p.startDate = document.getElementById('editProjectStart').value;
+  p.deadline = document.getElementById('editProjectDeadline').value;
+  
+  saveState();
+  closeModal('modalEditProject');
+  renderDashboard();
+  
+  const shiftDays = daysBetween(oldDeadline, p.deadline);
+  if (shiftDays !== 0) {
+    showToast('Проект обновлён', `Дедлайн изменён на ${shiftDays > 0 ? '+' : ''}${shiftDays} дн.`, shiftDays > 0 ? 'warning' : 'success');
+  } else {
+    showToast('Проект обновлён', 'Изменения сохранены', 'success');
+  }
+}
+
+function renderUrgentTasks() {
+  const urgent = [];
+  state.projects.forEach(p => {
+    p.tasks.forEach(t => {
+      const effStatus = getEffectiveStatus(t, p.tasks);
+      const daysToDeadline = daysBetween(todayStr, t.deadline);
+      if (effStatus === 'overdue' || (effStatus === 'need-start' && daysToDeadline <= 3 && daysToDeadline >= 0)) {
+        urgent.push({ task: t, project: p, type: effStatus === 'overdue' ? 'overdue' : 'soon', days: daysToDeadline });
+      }
+    });
+  });
+  const section = document.getElementById('urgentSection');
+  if (urgent.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  document.getElementById('urgentCount').textContent = urgent.length;
+  document.getElementById('urgentGrid').innerHTML = urgent.sort((a,b) => a.days - b.days).map(u => `
+    <div class="urgent-card ${u.type}" onclick="state.currentProjectId='${u.project.id}'; saveState(); switchScreen('screenTasks', document.querySelector('[data-screen=screenTasks]'))">
+      <div style="font-size:14px; font-weight:600; margin-bottom:6px;">${u.task.name}</div>
+      <div style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">📁 ${u.project.name}</div>
+      <div style="font-size:12px; color:var(--text-secondary);">📅 Дедлайн: ${formatDate(u.task.deadline)}</div>
+      <span class="urgent-tag ${u.type}">${u.type === 'overdue' ? ' Просрочено' : ` Осталось ${u.days} дн.`}</span>
+    </div>
+  `).join('');
+}
+
+// ===== TASKS & GANTT =====
+function populateProjectSelects() {
+  ['tasksProjectSelect', 'depProjectSelect', 'analysisProjectSelect'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = state.projects.map(p => `<option value="${p.id}" ${p.id === state.currentProjectId ? 'selected' : ''}>${p.name}</option>`).join('');
+  });
+}
+function renderTasksScreen() {
+  populateProjectSelects();
+  const p = getCurrentProject();
+  if (!p) return;
+  const daysLeft = daysBetween(todayStr, p.deadline);
+  document.getElementById('projectDeadlineDisplay').innerHTML = `📌 Дедлайн проекта: <strong>${formatDate(p.deadline)}</strong> (осталось ${daysLeft} дн.)`;
+  renderGantt(p);
+  renderTasksByStatus(p);
+}
+function renderGantt(p) {
+  const container = document.getElementById('ganttContainer');
+  const tasks = [...p.tasks].sort((a, b) => new Date(a.start) - new Date(b.start));
+  if (!tasks.length) { container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">Нет задач</div>'; return; }
+  const minDate = tasks.reduce((min, t) => t.start < min ? t.start : min, tasks[0].start);
+  const maxDate = tasks.reduce((max, t) => t.deadline > max ? t.deadline : max, tasks[0].deadline);
+  const totalDays = Math.max(daysBetween(minDate, maxDate) + 1, 1);
+  let labelsHtml = '<div class="gantt-label-header">Задача</div>';
+  tasks.forEach(t => {
+    const eff = getEffectiveStatus(t, p.tasks);
+    labelsHtml += `<div class="gantt-label" onclick="openTaskInfo('${t.id}')"><span style="width:8px; height:8px; border-radius:50%; background:var(--status-${eff === 'done' ? 'done' : eff === 'overdue' ? 'overdue' : eff === 'need-start' ? 'need-start' : eff === 'progress' ? 'progress' : eff === 'can-start' ? 'can-start' : 'queued'}); margin-right:10px;"></span>${t.name}</div>`;
+  });
+  let datesHtml = '';
+  let curr = new Date(minDate);
+  while (curr <= new Date(maxDate)) {
+    const isWeekend = curr.getDay() === 0 || curr.getDay() === 6;
+    datesHtml += `<div class="gantt-date-cell ${isWeekend ? 'weekend' : ''}"><span class="day-num">${curr.getDate()}</span><span style="font-size:9px;">${curr.toLocaleDateString('ru-RU', {month:'short'})}</span></div>`;
+    curr.setDate(curr.getDate() + 1);
+  }
+  let rowsHtml = '';
+  tasks.forEach(t => {
+    const eff = getEffectiveStatus(t, p.tasks);
+    const left = (daysBetween(minDate, t.start) / totalDays) * 100;
+    const width = Math.max((daysBetween(t.start, t.deadline) / totalDays) * 100, 1.5);
+    rowsHtml += `<div class="gantt-row"><div class="gantt-bar c-${eff}" style="left: ${left}%; width: ${width}%;" onclick="openTaskInfo('${t.id}')" title="${t.name}: ${formatDate(t.start)} — ${formatDate(t.deadline)}">${t.name}</div></div>`;
+  });
+  container.innerHTML = `<div class="gantt-container"><div class="gantt-labels">${labelsHtml}</div><div class="gantt-timeline"><div class="gantt-dates-header">${datesHtml}</div><div class="gantt-body">${rowsHtml}</div></div></div>`;
+}
+function renderTasksByStatus(p, search = '') {
+  const groups = { overdue: { title: '🔴 Просрочено', tasks: [] }, 'need-start': { title: '🟠 Необходимо начать', tasks: [] }, progress: { title: '🟡 В процессе', tasks: [] }, 'can-start': { title: ' Можно начать', tasks: [] }, queued: { title: '⚪ В очереди', tasks: [] }, done: { title: '🟢 Выполнено', tasks: [] } };
+  p.tasks.forEach(t => {
+    if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return;
+    const eff = getEffectiveStatus(t, p.tasks);
+    if (groups[eff]) groups[eff].tasks.push(t);
+  });
+  document.getElementById('tasksByStatus').innerHTML = Object.entries(groups).filter(([_, g]) => g.tasks.length > 0).map(([key, g]) => `
+    <div class="tasks-column">
+      <div class="tasks-column-header"><div class="tasks-column-title">${g.title}</div><div style="background:var(--bg-input); padding:2px 10px; border-radius:12px; font-size:12px;">${g.tasks.length}</div></div>
+      ${g.tasks.map(t => `
+        <div class="task-card" style="border-left-color: var(--status-${key});" onclick="openTaskInfo('${t.id}')">
+          <div class="task-card-title">${t.name}</div>
+          <div class="task-card-meta"> ${formatDate(t.deadline)} · 👤 ${t.assignee || '—'}</div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+// ===== DEPENDENCIES =====
+function renderDependenciesScreen() {
+  populateProjectSelects();
+  const p = getCurrentProject();
+  if (!p) return;
+  const container = document.getElementById('depGraph');
+  const tasks = [...p.tasks].sort((a, b) => new Date(a.start) - new Date(b.start));
+  const levels = {}; const visited = new Set(); const taskMap = new Map(p.tasks.map(t => [t.id, t]));
+  function getLevel(id) {
+    if (levels[id] !== undefined) return levels[id];
+    if (visited.has(id)) return 0;
+    visited.add(id);
+    const t = taskMap.get(id);
+    if (!t || !t.dependsOn.length) { levels[id] = 0; return 0; }
+    levels[id] = Math.max(...t.dependsOn.map(getLevel)) + 1;
+    return levels[id];
+  }
+  tasks.forEach(t => getLevel(t.id));
+  const maxLevel = Math.max(...Object.values(levels), 0);
+  const nodesPerLevel = {};
+  tasks.forEach(t => { const lvl = levels[t.id] || 0; if (!nodesPerLevel[lvl]) nodesPerLevel[lvl] = []; nodesPerLevel[lvl].push(t); });
+  const nodeWidth = 200, nodeHeight = 70, gapX = 80, gapY = 30, padding = 30;
+  const totalWidth = (maxLevel + 1) * (nodeWidth + gapX) + padding * 2;
+  const maxNodes = Math.max(...Object.values(nodesPerLevel).map(a => a.length));
+  const totalHeight = Math.max(400, maxNodes * (nodeHeight + gapY) + padding * 2);
+  container.style.minHeight = totalHeight + 'px'; container.style.width = totalWidth + 'px';
+  const positions = {};
+  Object.entries(nodesPerLevel).forEach(([lvl, nodes]) => {
+    const level = parseInt(lvl);
+    const x = padding + level * (nodeWidth + gapX);
+    const startY = padding + (totalHeight - padding * 2 - nodes.length * (nodeHeight + gapY) + gapY) / 2;
+    nodes.forEach((t, i) => { positions[t.id] = { x, y: startY + i * (nodeHeight + gapY) }; });
+  });
+  let html = `<svg class="dep-svg" width="${totalWidth}" height="${totalHeight}">`;
+  tasks.forEach(t => {
+    t.dependsOn.forEach(depId => {
+      const from = positions[depId], to = positions[t.id];
+      if (!from || !to) return;
+      const x1 = from.x + nodeWidth, y1 = from.y + nodeHeight / 2, x2 = to.x, y2 = to.y + nodeHeight / 2;
+      const midX = (x1 + x2) / 2;
+      html += `<path d="M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}" fill="none" stroke="var(--accent-primary)" stroke-width="2" marker-end="url(#arrow)" opacity="0.5"/>`;
+    });
+  });
+  html += `<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><polygon points="0 0, 10 3, 0 6" fill="var(--accent-primary)"/></marker></defs></svg>`;
+  tasks.forEach(t => {
+    const pos = positions[t.id];
+    const eff = getEffectiveStatus(t, p.tasks);
+    const color = `var(--status-${eff === 'done' ? 'done' : eff === 'overdue' ? 'overdue' : eff === 'need-start' ? 'need-start' : eff === 'progress' ? 'progress' : eff === 'can-start' ? 'can-start' : 'queued'})`;
+    html += `<div class="dep-node" style="left: ${pos.x}px; top: ${pos.y}px; border-color: ${color};" onclick="openTaskInfo('${t.id}')">
+      <div class="dep-node-title">${t.name}</div>
+      <div class="dep-node-dates">${formatDateShort(t.start)} — ${formatDateShort(t.deadline)}</div>
+      <span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; margin-top:6px; background: ${color}20; color: ${color};">${getStatusName(eff)}</span>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+// ===== ANALYSIS =====
+function renderAnalysisScreen() {
+  populateProjectSelects();
+  const p = getCurrentProject();
+  if (!p) return;
+  const sel = document.getElementById('analysisTask');
+  sel.innerHTML = '<option value="">— Выберите задачу —</option>' + p.tasks.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  document.getElementById('analysisResult').style.display = 'none';
+  document.getElementById('analysisPlaceholder').style.display = 'block';
+}
+function updateAnalysisDeadline() {
+  const p = getCurrentProject();
+  const t = p.tasks.find(x => x.id === document.getElementById('analysisTask').value);
+  document.getElementById('analysisCurrentDeadline').value = t ? formatDate(t.deadline) : '';
+  document.getElementById('analysisNewDeadline').value = t ? t.deadline : '';
+}
+
+function getAffectedTasks(taskId) {
+  const p = getCurrentProject();
+  const affected = [];
+  const queue = [taskId]; const visited = new Set();
+  while(queue.length) {
+    const id = queue.shift();
+    if(visited.has(id)) continue;
+    visited.add(id);
+    p.tasks.forEach(t => {
+      if(t.dependsOn.includes(id) && t.id !== taskId) { affected.push(t); queue.push(t.id); }
+    });
+  }
+  return affected;
+}
+
+function calculateImpact() {
+  const p = getCurrentProject();
+  const taskId = document.getElementById('analysisTask').value;
+  const newDeadline = document.getElementById('analysisNewDeadline').value;
+  if (!taskId || !newDeadline) { showToast('Ошибка', 'Выберите задачу и укажите новый дедлайн', 'danger'); return; }
+  const task = p.tasks.find(t => t.id === taskId);
+  const shiftDays = daysBetween(task.deadline, newDeadline);
+  const affected = getAffectedTasks(taskId);
+
+  const originalDeadline = task.deadline;
+  task.deadline = newDeadline;
+  const allDeadlines = p.tasks.map(t => t.deadline);
+  const maxDeadline = allDeadlines.reduce((a, b) => a > b ? a : b);
+  const projectShift = Math.max(0, daysBetween(p.deadline, maxDeadline));
+  task.deadline = originalDeadline;
+
+  const atRisk = affected.filter(t => {
+    const shiftedDeadline = addDays(t.deadline, Math.max(0, shiftDays));
+    return shiftedDeadline > p.deadline;
+  });
+
+  const hasDownstream = new Set(p.tasks.flatMap(t => t.dependsOn));
+  const finalTasks = p.tasks.filter(t => !p.tasks.some(x => x.dependsOn.includes(t.id))).map(t => t.id);
+  const critical = new Set();
+  const critQueue = [...finalTasks];
+  while (critQueue.length) {
+    const cur = critQueue.shift();
+    if (critical.has(cur)) continue;
+    critical.add(cur);
+    p.tasks.filter(t => t.dependsOn.includes(cur)).forEach(t => critQueue.push(t.id));
+  }
+  const criticalAffected = affected.filter(t => critical.has(t.id));
+
+  const interventionRequired = projectShift > 0 || atRisk.length > 0;
+
+  document.getElementById('analysisPlaceholder').style.display = 'none';
+  const res = document.getElementById('analysisResult');
+  res.style.display = 'block';
+
+  let alertClass = 'success', icon = '✅', title = 'Изменение безопасно', text = 'Проект не выходит за установленные сроки.';
+  if (projectShift > 0) { alertClass = 'danger'; icon = ''; title = `Срок проекта увеличится на ${projectShift} дн.!`; text = `Изменение дедлайна задачи «${task.name}» сдвигает финальные работы за пределы ${formatDate(p.deadline)}.`; }
+  else if (shiftDays > 0 && affected.length > 0) { alertClass = 'warning'; icon = '️'; title = `Затронуто ${affected.length} задач`; text = 'Срок проекта пока в норме, но последующие задачи сдвинутся.'; }
+
+  let recommendation = '';
+  if (projectShift > 0) {
+    recommendation = `Необходимо вмешательство! Рассмотрите: (1) перенос дедлайна проекта, (2) параллельное выполнение задач, (3) добавление ресурсов.`;
+  } else if (atRisk.length > 0) {
+    recommendation = `Задачи под угрозой: ${atRisk.map(t => t.name).join(', ')}. Рекомендуется контроль.`;
+  } else if (shiftDays < 0) {
+    recommendation = 'Задача ускоряется — можно использовать буфер для улучшения качества.';
+  } else {
+    recommendation = 'Изменение безопасно, можно применять.';
+  }
+
+  res.innerHTML = `
+    <div class="result-alert ${alertClass}">
+      <div style="font-weight:600; font-size:15px; margin-bottom:6px;">${icon} ${title}</div>
+      <div style="font-size:14px; color:var(--text-secondary);">${text}</div>
+    </div>
+    <div class="result-block">
+      <div class="result-block-title">📋 Затронуто ${affected.length} последующих задач</div>
+      <div>${affected.length > 0 ? affected.map(t => `<span class="result-task-chip">${t.name}</span>`).join('') : '<span style="color:var(--text-muted)">Нет зависимых задач</span>'}</div>
+    </div>
+    ${atRisk.length > 0 ? `
+    <div class="result-block">
+      <div class="result-block-title">🔴 ${atRisk.length} задач под угрозой срыва</div>
+      <div>${atRisk.map(t => `<span class="result-task-chip danger">${t.name}</span>`).join('')}</div>
+      <div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">Их дедлайн выходит за рамки проекта (${formatDate(p.deadline)})</div>
+    </div>` : ''}
+    ${criticalAffected.length > 0 ? `
+    <div class="result-block">
+      <div class="result-block-title">⚡ ${criticalAffected.length} критических задач</div>
+      <div>${criticalAffected.map(t => `<span class="result-task-chip critical">${t.name}</span>`).join('')}</div>
+      <div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">Лежат на критическом пути — влияют на финальный срок</div>
+    </div>` : ''}
+    <div class="result-block">
+      <div class="result-block-title">👤 Требуется вмешательство?</div>
+      <div style="font-weight:600; color: ${interventionRequired ? 'var(--status-overdue)' : 'var(--status-done)'};">${interventionRequired ? '⚠️ ДА — необходимо принять решение' : '✅ Нет — изменение безопасно'}</div>
+    </div>
+    <div class="result-recommendation">
+      <div style="font-weight:600; font-size:14px; margin-bottom:4px; color:var(--status-can-start);">💡 Рекомендация</div>
+      <div style="font-size:13px; color:var(--text-secondary);">${recommendation}</div>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button class="btn btn-ghost" style="flex:1; justify-content:center;" onclick="openTaskInfo('${taskId}'); switchScreen('screenTasks', document.querySelector('[data-screen=screenTasks]'))">← К задаче</button>
+      <button class="btn btn-primary" style="flex:1; justify-content:center;" onclick="applyChange('${taskId}', '${newDeadline}')">✓ Применить</button>
+    </div>`;
+}
+
+function applyChange(taskId, newDeadline) {
+  const p = getCurrentProject();
+  const t = p.tasks.find(x => x.id === taskId);
+  const oldDeadline = t.deadline;
+  t.deadline = newDeadline;
+  saveState();
+  showToast('Применено', `Дедлайн "${t.name}": ${formatDate(oldDeadline)} → ${formatDate(newDeadline)}`, 'success');
+  renderAnalysisScreen();
+}
+
+// ===== АНАЛИЗ РИСКОВ ПРИ ИЗМЕНЕНИИ ЗАДАЧИ В МОДАЛКЕ =====
+function analyzeTaskChange() {
+  const p = getCurrentProject();
+  const t = p.tasks.find(x => x.id === window.currentEditTaskId);
+  if (!t) return;
+  
+  const newStart = document.getElementById('editTaskStart').value;
+  const newDeadline = document.getElementById('editTaskDeadline').value;
+  const newStatus = document.getElementById('editTaskStatus').value;
+  const newDeps = Array.from(document.getElementById('editTaskDependsOn').selectedOptions).map(o => o.value);
+  
+  if (!newStart || !newDeadline) return;
+  
+  const oldDeadline = t.deadline;
+  const oldDeps = t.dependsOn;
+  const shiftDays = daysBetween(oldDeadline, newDeadline);
+  const depsChanged = JSON.stringify(oldDeps.sort()) !== JSON.stringify(newDeps.sort());
+  
+  const affected = getAffectedTasks(t.id);
+  const atRisk = affected.filter(a => {
+    const shifted = addDays(a.deadline, Math.max(0, shiftDays));
+    return shifted > p.deadline;
+  });
+  
+  let riskHtml = '';
+  
+  if (shiftDays > 0) {
+    riskHtml += `<div class="risk-item high">
+      <div class="risk-icon">🚨</div>
+      <div class="risk-content">
+        <div class="risk-title">Дедлайн сдвигается на +${shiftDays} дн.</div>
+        <div class="risk-desc">Задача завершится позже запланированного срока</div>
+        <div class="cost-badge">Стоимость: ${shiftDays} дней задержки</div>
+      </div>
+    </div>`;
+  } else if (shiftDays < 0) {
+    riskHtml += `<div class="risk-item low">
+      <div class="risk-icon">✅</div>
+      <div class="risk-content">
+        <div class="risk-title">Дедлайн ускоряется на ${Math.abs(shiftDays)} дн.</div>
+        <div class="risk-desc">Задача завершится раньше срока</div>
+      </div>
+    </div>`;
+  }
+  
+  if (affected.length > 0) {
+    riskHtml += `<div class="risk-item medium">
+      <div class="risk-icon">🔗</div>
+      <div class="risk-content">
+        <div class="risk-title">Затронуто ${affected.length} зависимых задач</div>
+        <div class="risk-desc">${affected.map(a => a.name).join(', ')}</div>
+        <div class="cost-badge">Влияние: каскадный сдвиг</div>
+      </div>
+    </div>`;
+  }
+  
+  if (atRisk.length > 0) {
+    riskHtml += `<div class="risk-item high">
+      <div class="risk-icon">⚠️</div>
+      <div class="risk-content">
+        <div class="risk-title">${atRisk.length} задач под угрозой срыва</div>
+        <div class="risk-desc">${atRisk.map(a => a.name).join(', ')}</div>
+        <div class="cost-badge">Риск: выход за сроки проекта</div>
+      </div>
+    </div>`;
+  }
+  
+  if (depsChanged) {
+    const addedDeps = newDeps.filter(d => !oldDeps.includes(d));
+    const removedDeps = oldDeps.filter(d => !newDeps.includes(d));
+    if (addedDeps.length > 0) {
+      const addedNames = addedDeps.map(id => p.tasks.find(t => t.id === id)?.name).filter(Boolean).join(', ');
+      riskHtml += `<div class="risk-item medium">
+        <div class="risk-icon">➕</div>
+        <div class="risk-content">
+          <div class="risk-title">Добавлены зависимости: ${addedNames}</div>
+          <div class="risk-desc">Задача теперь зависит от дополнительных задач</div>
+        </div>
+      </div>`;
+    }
+    if (removedDeps.length > 0) {
+      const removedNames = removedDeps.map(id => p.tasks.find(t => t.id === id)?.name).filter(Boolean).join(', ');
+      riskHtml += `<div class="risk-item low">
+        <div class="risk-icon">➖</div>
+        <div class="risk-content">
+          <div class="risk-title">Удалены зависимости: ${removedNames}</div>
+          <div class="risk-desc">Задача больше не зависит от этих задач</div>
+        </div>
+      </div>`;
+    }
+  }
+  
+  if (newStatus === 'done' && t.status !== 'done') {
+    riskHtml += `<div class="risk-item low">
+      <div class="risk-icon">✅</div>
+      <div class="risk-content">
+        <div class="risk-title">Статус изменён на "Выполнено"</div>
+        <div class="risk-desc">Зависимые задачи могут быть начаты раньше</div>
+      </div>
+    </div>`;
+  }
+  
+  if (riskHtml) {
+    document.getElementById('taskRiskContent').innerHTML = riskHtml;
+    document.getElementById('taskChangeRiskAnalysis').style.display = 'block';
+  } else {
+    document.getElementById('taskChangeRiskAnalysis').style.display = 'none';
+  }
+}
+
+// ===== EMPLOYEES =====
+function renderEmployees(search = '') {
+  const grid = document.getElementById('employeesGrid');
+  const filtered = state.employees.filter(e => e.name.toLowerCase().includes(search.toLowerCase()) || e.role.toLowerCase().includes(search.toLowerCase()));
+  grid.innerHTML = filtered.map(e => `
+    <div class="employee-card">
+      <div class="employee-avatar">${e.name.split(' ').map(n=>n[0]).join('').substring(0,2)}</div>
+      <div class="employee-info">
+        <h4>${e.name}</h4>
+        <p>${e.role}</p>
+      </div>
+      <button class="btn-delete-emp" onclick="deleteEmployee('${e.id}')" title="Удалить">🗑</button>
+    </div>
+  `).join('');
+}
+function createEmployee() {
+  const name = document.getElementById('empName').value.trim();
+  const role = document.getElementById('empRole').value.trim();
+  if (!name || !role) { showToast('Ошибка', 'Заполните все поля', 'danger'); return; }
+  state.employees.push({ id: 'e' + Date.now(), name, role });
+  saveState(); closeModal('modalAddEmployee');
+  document.getElementById('empName').value = ''; document.getElementById('empRole').value = '';
+  renderEmployees(); showToast('Успех', 'Сотрудник добавлен', 'success');
+}
+function deleteEmployee(id) {
+  if(!confirm('Удалить сотрудника?')) return;
+  state.employees = state.employees.filter(e => e.id !== id);
+  saveState(); renderEmployees();
+}
+
+// ===== КОНТР-ФИЧА: РЕКОМЕНДАЦИИ ПО РЕСУРСАМ =====
+function renderRecommendations() {
+  const p = getCurrentProject();
+  if (!p) return;
+  
+  const recommendations = [];
+  
+  // Анализ загрузки сотрудников
+  const employeeWorkload = {};
+  state.employees.forEach(e => {
+    const tasks = p.tasks.filter(t => t.assignee === e.name && t.status !== 'done');
+    employeeWorkload[e.name] = tasks;
+  });
+  
+  // Найти перегруженных
+  Object.entries(employeeWorkload).forEach(([name, tasks]) => {
+    if (tasks.length >= 3) {
+      recommendations.push({
+        type: 'high',
+        title: ` ${name} перегружен (${tasks.length} задач)`,
+        desc: `Рекомендуется перераспределить задачи: ${tasks.map(t => t.name).join(', ')}`,
+        action: 'Перераспределить задачи'
+      });
+    }
+  });
+  
+  // Найти задачи без ответственного
+  const unassigned = p.tasks.filter(t => !t.assignee && t.status !== 'done');
+  if (unassigned.length > 0) {
+    recommendations.push({
+      type: 'medium',
+      title: `🟠 ${unassigned.length} задач без ответственного`,
+      desc: unassigned.map(t => t.name).join(', '),
+      action: 'Назначить ответственных'
+    });
+  }
+  
+  // Найти просроченные задачи
+  const overdue = p.tasks.filter(t => t.deadline < todayStr && t.status !== 'done');
+  if (overdue.length > 0) {
+    recommendations.push({
+      type: 'high',
+      title: ` ${overdue.length} просроченных задач`,
+      desc: overdue.map(t => `${t.name} (дедлайн: ${formatDate(t.deadline)})`).join(', '),
+      action: 'Срочно принять меры'
+    });
+  }
+  
+  // Найти задачи с близким дедлайном
+  const urgent = p.tasks.filter(t => {
+    const daysLeft = daysBetween(todayStr, t.deadline);
+    return daysLeft <= 3 && daysLeft >= 0 && t.status !== 'done';
+  });
+  if (urgent.length > 0) {
+    recommendations.push({
+      type: 'medium',
+      title: `🟠 ${urgent.length} задач с дедлайном ≤ 3 дней`,
+      desc: urgent.map(t => t.name).join(', '),
+      action: 'Контролировать выполнение'
+    });
+  }
+  
+  // Найти узкие места (задачи от которых зависит много других)
+  const bottleneckTasks = p.tasks.filter(t => {
+    const dependents = p.tasks.filter(x => x.dependsOn.includes(t.id));
+    return dependents.length >= 2 && t.status !== 'done';
+  });
+  if (bottleneckTasks.length > 0) {
+    recommendations.push({
+      type: 'medium',
+      title: `🔵 ${bottleneckTasks.length} узких мест`,
+      desc: bottleneckTasks.map(t => `${t.name} (блокирует ${p.tasks.filter(x => x.dependsOn.includes(t.id)).length} задач)`).join(', '),
+      action: 'Приоритизировать выполнение'
+    });
+  }
+  
+  const content = document.getElementById('recommendationsContent');
+  if (recommendations.length === 0) {
+    content.innerHTML = '<div style="color:var(--text-secondary); font-size:13px;">✅ Нет критических рекомендаций. Проект в норме!</div>';
+  } else {
+    content.innerHTML = recommendations.map(r => `
+      <div class="recommendation-item" style="border-left-color: ${r.type === 'high' ? 'var(--status-overdue)' : r.type === 'medium' ? 'var(--status-need-start)' : 'var(--status-can-start)'};">
+        <strong>${r.title}</strong>
+        <p>${r.desc}</p>
+        <button class="btn btn-ghost" style="margin-top:8px; padding:6px 12px; font-size:12px;" onclick="showToast('Действие', '${r.action} запрошено', 'info')">${r.action}</button>
+      </div>
+    `).join('');
+  }
+}
+
+// ===== TASK CRUD =====
+function openAddTaskModal() {
+  const p = getCurrentProject();
+  document.getElementById('taskAssignee').innerHTML = '<option value="">— Выберите —</option>' + state.employees.map(e => `<option>${e.name}</option>`).join('');
+  document.getElementById('taskDependsOn').innerHTML = p.tasks.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  ['taskName', 'taskDesc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('taskStart').value = todayStr;
+  document.getElementById('taskDeadline').value = addDays(todayStr, 7);
+  openModal('modalAddTask');
+}
+function createTask() {
+  const p = getCurrentProject();
+  const name = document.getElementById('taskName').value.trim();
+  const start = document.getElementById('taskStart').value;
+  const deadline = document.getElementById('taskDeadline').value;
+  if (!name || !start || !deadline) { showToast('Ошибка', 'Заполните название и сроки', 'danger'); return; }
+  const dependsOn = Array.from(document.getElementById('taskDependsOn').selectedOptions).map(o => o.value);
+  p.tasks.push({
+    id: 't' + Date.now(), name, start, deadline,
+    status: document.getElementById('taskStatus').value,
+    assignee: document.getElementById('taskAssignee').value,
+    desc: document.getElementById('taskDesc').value.trim(),
+    dependsOn
+  });
+  saveState(); closeModal('modalAddTask'); renderTasksScreen();
+  showToast('Успех', `Задача "${name}" создана`, 'success');
+}
+
+function openTaskInfo(taskId) {
+  const p = getCurrentProject();
+  const t = p.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  window.currentEditTaskId = taskId;
+
+  document.getElementById('taskInfoTitle').textContent = t.name;
+  document.getElementById('editTaskStart').value = t.start;
+  document.getElementById('editTaskDeadline').value = t.deadline;
+  document.getElementById('editTaskDesc').value = t.desc || '';
+  document.getElementById('editTaskAssignee').innerHTML = '<option value="">— Выберите —</option>' + state.employees.map(e => `<option ${e.name === t.assignee ? 'selected' : ''}>${e.name}</option>`).join('');
+  document.getElementById('editTaskStatus').value = t.status === 'done' ? 'done' : 'progress';
+
+  const otherTasks = p.tasks.filter(x => x.id !== taskId);
+  document.getElementById('editTaskDependsOn').innerHTML = otherTasks.map(x =>
+    `<option value="${x.id}" ${t.dependsOn.includes(x.id) ? 'selected' : ''}>${x.name}</option>`
+  ).join('');
+
+  document.getElementById('taskChangeRiskAnalysis').style.display = 'none';
+  openModal('modalTaskInfo');
+}
+
+function saveTaskEdit() {
+  const p = getCurrentProject();
+  const t = p.tasks.find(x => x.id === window.currentEditTaskId);
+  if (!t) return;
+
+  const oldDeadline = t.deadline;
+  const oldDeps = [...t.dependsOn];
+
+  t.start = document.getElementById('editTaskStart').value;
+  t.deadline = document.getElementById('editTaskDeadline').value;
+  t.desc = document.getElementById('editTaskDesc').value.trim();
+  t.assignee = document.getElementById('editTaskAssignee').value;
+  t.status = document.getElementById('editTaskStatus').value;
+  t.dependsOn = Array.from(document.getElementById('editTaskDependsOn').selectedOptions).map(o => o.value);
+
+  saveState();
+  closeModal('modalTaskInfo');
+  renderTasksScreen();
+
+  const depsChanged = JSON.stringify(oldDeps.sort()) !== JSON.stringify(t.dependsOn.sort());
+  if (depsChanged) {
+    showToast('🔗 Зависимости обновлены', `Связи задачи "${t.name}" изменены`, 'warning');
+  } else if (t.deadline !== oldDeadline) {
+    const affected = getAffectedTasks(t.id);
+    if (affected.length > 0) {
+      showToast('⚠️ Влияние на проект', `Затронуто задач: ${affected.length}. Проверьте "Анализ изменений"`, 'warning');
+    } else {
+      showToast('Сохранено', `Задача "${t.name}" обновлена`, 'success');
+    }
+  } else {
+    showToast('Сохранено', `Задача "${t.name}" обновлена`, 'success');
+  }
+}
+
+function confirmDeleteTask() {
+  const p = getCurrentProject();
+  const t = p.tasks.find(x => x.id === window.currentEditTaskId);
+  if (!t) return;
+  
+  const affected = getAffectedTasks(t.id);
+  const tasksThatDependOnThis = p.tasks.filter(x => x.dependsOn.includes(t.id));
+  
+  if (affected.length > 0 || tasksThatDependOnThis.length > 0) {
+    let message = `Удалить задачу "${t.name}"?\n\n`;
+    if (tasksThatDependOnThis.length > 0) {
+      message += `⚠️ От неё зависят: ${tasksThatDependOnThis.map(x => x.name).join(', ')}\n`;
+    }
+    if (affected.length > 0) {
+      message += `🔗 Будет затронуто: ${affected.length} задач\n`;
+    }
+    message += `\nЗависимости будут сброшены.`;
+    
+    if (!confirm(message)) return;
+  } else {
+    if (!confirm(`Удалить задачу "${t.name}"?`)) return;
+  }
+  
+  const name = t.name;
+  p.tasks = p.tasks.filter(x => x.id !== window.currentEditTaskId);
+  p.tasks.forEach(x => { x.dependsOn = x.dependsOn.filter(id => id !== window.currentEditTaskId); });
+  saveState(); closeModal('modalTaskInfo'); renderTasksScreen();
+  showToast('Удалено', `Задача "${name}" удалена`, 'success');
+}
+
+function createProject() {
+  const name = document.getElementById('newProjectName').value.trim();
+  const start = document.getElementById('newProjectStart').value;
+  const deadline = document.getElementById('newProjectDeadline').value;
+  if (!name || !start || !deadline) { showToast('Ошибка', 'Заполните все поля', 'danger'); return; }
+  state.projects.push({ id: 'p' + Date.now(), name, startDate: start, deadline, tasks: [] });
+  saveState(); closeModal('modalCreateProject');
+  document.getElementById('newProjectName').value = '';
+  renderDashboard(); showToast('Успех', `Проект "${name}" создан`, 'success');
+}
+
+// ===== INIT =====
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('active'); });
+});
+switchScreen('screenDashboard', document.querySelector('[data-screen="screenDashboard"]'));
+</script>
+</body>
+</html>
